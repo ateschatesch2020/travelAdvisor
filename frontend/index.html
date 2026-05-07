@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 10px;
+      border: 2px solid #f9fafb;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    .break-text {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans h-screen flex overflow-hidden">
+  <div class="w-72 bg-white flex flex-col border-r border-gray-200 hidden md:flex z-30 flex-shrink-0">
+    <div class="p-5 border-b border-gray-100 flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-md shadow-blue-200">
+        <i class="fa-solid fa-brain text-white text-sm"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg tracking-tight text-gray-900">
+          AI Assistant
+        </h1>
+        <p class="text-xs text-gray-500">v1.0</p>
+      </div>
+    </div>
+    <div class="p-4">
+      <button id="newSessionBtn"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
+        <i class="fa-solid fa-plus text-sm"></i>
+        <span class="font-medium text-sm">New Chat</span>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto px-3 space-y-1" id="sessionList"></div>
+    <div class="p-4 border-t border-gray-100 bg-gray-50">
+      <div class="flex items-center gap-3 w-full p-2">
+        <div id="userDisplayCharacter"
+          class="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center text-white font-bold shadow-sm">
+         
+        </div>
+        <div class="text-left flex-1">
+          <p id="userDisplayName" class="text-sm font-semibold text-gray-700"></p>
+          <p class="text-xs text-green-600 font-medium">● Online</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex-1 flex flex-col h-full bg-gray-50/50 min-w-0 relative">
+    <div
+      class="h-16 shrink-0 border-b border-gray-200 flex items-center justify-between px-6 bg-white/80 backdrop-blur-md z-10">
+      <div class="flex items-center gap-2 text-gray-500">
+        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+        <span class="text-xs font-medium">System Ready</span>
+      </div>
+      <button id="resetBtn"
+        class="text-xs text-gray-400 hover:text-red-500 transition-colors bg-gray-100 px-3 py-1.5 rounded-full"
+        title="Reset Session">
+        <i class="fa-solid fa-power-off mr-1"></i> Reset
+      </button>
+    </div>
+
+    <div id="chatContainer" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth w-full">
+      <div id="welcomeScreen" class="flex flex-col items-center justify-center h-full text-center animate-fade-in px-4">
+        <div
+          class="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-gray-200 border border-gray-100">
+          <i class="fa-solid fa-robot text-4xl text-blue-600"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-2">Hello!</h2>
+        <p class="text-gray-500 max-w-md">How can I help you?</p>
+      </div>
+    </div>
+
+    <div class="shrink-0 p-4 md:p-6 bg-white border-t border-gray-200 z-20 w-full">
+      <div class="max-w-4xl mx-auto relative group">
+        <div
+          class="relative flex items-end gap-2 bg-gray-50 border border-gray-200 rounded-2xl p-2 shadow-inner focus-within:bg-white focus-within:shadow-md focus-within:border-blue-300 transition-all">
+          <textarea id="userInput" rows="1"
+            class="flex-1 bg-transparent border-none outline-none text-gray-800 placeholder-gray-400 py-3 px-3 resize-none max-h-32 text-sm md:text-base font-sans"
+            placeholder="Write a message..."></textarea>
+
+          <button type="button" id="sendBtn"
+            class="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fa-solid fa-paper-plane"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <script src="chatbot.js"></script>
+
+</body>
+
+</html>
