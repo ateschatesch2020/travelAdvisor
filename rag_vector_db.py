@@ -13,15 +13,15 @@ loader = PyPDFLoader(file_name)
 docs = loader.load()
 
 spliter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=100
+    chunk_size=300,
+    chunk_overlap=20
 )
 
 document_pieces = spliter.split_documents(docs)
 
 # embedding_model = HuggingFaceEmbeddings(model="sentence-transformers/all-MiniLM-L6-v2")
 # Use OpenAI-compatible Embeddings via OpenRouter
-embedding_model  = OpenAIEmbeddings(
+embedding_model = OpenAIEmbeddings(
     model="openai/text-embedding-3-small",
     base_url="https://openrouter.ai/api/v1",
     api_key=os.getenv("OPENROUTER_API_KEY"))

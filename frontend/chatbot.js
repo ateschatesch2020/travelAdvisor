@@ -147,6 +147,7 @@ class ChatBot {
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
       let isFirstChunk = true;
+      let fullText = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -159,9 +160,11 @@ class ChatBot {
         }
 
         const chunk = decoder.decode(value, { stream: true });
-        contentDiv.textContent += chunk;
+        fullText += chunk;
+        contentDiv.textContent = fullText;
         this.scrollToBottom();
       }
+      contentDiv.innerHTML = this.renderContent(fullText);
     } catch (err) {
       if (err.name === "AbortError") {
         contentDiv.innerHTML = "<span class='text-xs text-red-500 italic'>Interrupted.</span>";
@@ -295,10 +298,23 @@ class ChatBot {
 
     div.innerHTML =
       avatar +
-      `<div class="max-w-[85%] md:max-w-[75%] min-w-0"><div class="message-content text-[15px] leading-relaxed py-3.5 px-5 break-text ${bubbleStyle}">${isUser ? this.escapeHtml(text) : text}</div></div>`;
+      `<div class="max-w-[85%] md:max-w-[75%] min-w-0"><div class="message-content text-[15px] leading-relaxed py-3.5 px-5 break-text ${bubbleStyle}">${isUser ? this.escapeHtml(text) : this.renderContent(text)}</div></div>`;
 
     container.appendChild(div);
     return div;
+  }
+
+  renderContent(text) {
+    const parts = text.split(/(!\[[^\]]*\]\(https?:\/\/[^\)]+\))/g);
+    return parts.map(part => {
+      const m = part.match(/^!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)$/);
+      if (m) {
+        const alt = this.escapeHtml(m[1]);
+        const src = this.escapeHtml(m[2]);
+        return `<img src="${src}" alt="${alt}" class="rounded-lg max-w-xs block mt-1 mb-2" />`;
+      }
+      return this.escapeHtml(part);
+    }).join('');
   }
 
   escapeHtml(text) {
