@@ -110,13 +110,9 @@ def search_weather(city: str, date: str) -> dict:
     """
     import requests
     url = "http://api.weatherapi.com/v1/forecast.json"
-    params = {
-        "key": os.getenv("WEATHER_API_KEY"),
-        "q": city,
-        "dt": date,
-        "days": 1,
-    }
-    raw = requests.get(url, params=params).json()
+    params = {"q": city, "dt": date, "days": 1}
+    headers = {"key": os.getenv("WEATHER_API_KEY")}
+    raw = requests.get(url, params=params, headers=headers).json()
     forecastdays = raw.get("forecast", {}).get("forecastday", [])
     if not forecastdays:
         logger.warning("search_weather: no forecast data for %s on %s", city, date)

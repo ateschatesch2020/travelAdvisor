@@ -7,7 +7,8 @@
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object FullName)",
       "Bash(grep -E \"\\\\.py$|\\\\.md$|\\\\.txt$|\\\\.json$\")",
-      "Bash(python -m unittest test_optimize_itinerary -v)"
+      "Bash(python -m unittest test_optimize_itinerary -v)",
+      "Bash(grep -E \"\\\\.md|\\\\.txt|\\\\.json|\\\\.py$\")"
     ]
   }
 }

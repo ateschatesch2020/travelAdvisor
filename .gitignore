@@ -21,3 +21,6 @@ chroma_db/
 # IDE
 .vscode/
 .idea/
+
+# Logs
+app.log

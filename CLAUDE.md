@@ -77,9 +77,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ### Running the project
 
-**Backend** (FastAPI, port 8001):
+**Backend** (FastAPI, port 8001) — run from project root:
 ```bash
-python api.py
+python backend/api.py
 ```
 
 **Frontend** (Vite, port 5173):
@@ -87,15 +87,25 @@ python api.py
 cd frontend && npm run dev
 ```
 
-**Populate vector DB** (run once, or when the source PDF changes):
+**Populate vector DB** (run once, or when the source PDF changes) — run from project root:
 ```bash
-python rag_vector_db.py
+python backend/rag_vector_db.py
 ```
 Source PDF must be at `./documents/Corporate_Travel_and_Expense_Policy.pdf`.
+
+**Run tests** — run from project root:
+```bash
+pytest backend/tests/
+```
 
 ### Required environment variables (.env)
 - `OPENROUTER_API_KEY` — LLM (gpt-4o-mini) and embeddings (text-embedding-3-small) via OpenRouter
 - `SERPAPI_KEY` — Google Flights and Google Hotels via SerpAPI
+
+### Security
+
+- **Never pass API keys as URL query parameters.** Keys in URLs appear in logs, browser history, and proxy/referrer headers. Always pass them in HTTP request headers (e.g., `Authorization: Bearer <token>` or a service-specific header like `key: <token>`).
+- **Never call external APIs with secret keys from the frontend.** All calls to SerpAPI, WeatherAPI, OpenRouter, or any keyed external service must go through the backend. The frontend only calls `localhost:8001`.
 
 ### Architecture
 
@@ -103,10 +113,10 @@ Source PDF must be at `./documents/Corporate_Travel_and_Expense_Policy.pdf`.
 Browser (frontend/index.html + chatbot.js)
     │ HTTP streaming  POST /chat
     ▼
-api.py  (FastAPI)  → calls chatbot.chat_stream(session_id, query)
+backend/api.py  (FastAPI)  → calls chatbot.chat_stream(session_id, query)
     ▼
-chatbot.py  ChatbotManager
-    ├── RAG: Chroma vector DB (chroma_db/) ← populated from PDF by rag_vector_db.py
+backend/chatbot.py  ChatbotManager
+    ├── RAG: Chroma vector DB (chroma_db/) ← populated from PDF by backend/rag_vector_db.py
     │         top-2 chunks injected as context into every message
     ├── Agent: LangGraph ReAct agent (myagent)
     │         tools defined in tools.py → search_flights, search_hotels (SerpAPI)
@@ -123,9 +133,9 @@ chatbot.py  ChatbotManager
 
 ### Adding a new tool
 
-1. Define `@tool` function in `tools.py` with a clear docstring (the LLM uses this to decide when to call it).
+1. Define `@tool` function in `backend/tools.py` with a clear docstring (the LLM uses this to decide when to call it).
 2. Add it to `Tools.tools = [...]`.
-3. Restart `api.py` — no prompt changes needed; the agent auto-discovers tools via function calling.
+3. Restart `backend/api.py` — no prompt changes needed; the agent auto-discovers tools via function calling.
 
 ### Key design decisions
 - `chat` / `chat_stream` use the agent (not `conversation_chain`); `_create_chain` / `conversation_chain` exist but are unused.
