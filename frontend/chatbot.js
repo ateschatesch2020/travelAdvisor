@@ -40,6 +40,8 @@ class ChatBot {
     const userDisplayCharacter = document.getElementById("userDisplayCharacter");
     if (userDisplayCharacter) userDisplayCharacter.textContent = this.USER_ID.slice(0, 2).toUpperCase();
     
+    this.updateRateLimitDisplay();
+
     //load all sessions on the left side of page
     await this.loadSessions();
 
@@ -186,6 +188,7 @@ class ChatBot {
       sendBtn.classList.add("bg-blue-600", "hover:bg-blue-700");
       this.scrollToBottom();
       input.focus();
+      this.updateRateLimitDisplay();
     }
   }
 
@@ -329,6 +332,38 @@ class ChatBot {
         });
       }, 50);
     }
+  }
+
+  async updateRateLimitDisplay() {
+    try {
+      const res = await fetch(`${this.API_URL}/rate-status`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const remaining = parseInt(data["x-ratelimit-remaining-requests"] ?? data["x-ratelimit-remaining-tokens"] ?? "0");
+      const limit = parseInt(data["x-ratelimit-limit-requests"] ?? data["x-ratelimit-limit-tokens"] ?? "1");
+      const pct = limit > 0 ? (remaining / limit) * 100 : 100;
+
+      const badge = document.getElementById("rateLimitBadge");
+      const text = document.getElementById("rateLimitText");
+      if (!badge || !text) return;
+
+      const remVal = data["x-ratelimit-remaining-requests"];
+      const limVal = data["x-ratelimit-limit-requests"];
+      if (!remVal && !limVal) return;
+      text.textContent = `Requests: ${remVal} / ${limVal}`;
+      badge.classList.remove("hidden",
+        "bg-green-50", "text-green-700", "border-green-200",
+        "bg-yellow-50", "text-yellow-700", "border-yellow-200",
+        "bg-red-50", "text-red-700", "border-red-200");
+      if (pct > 50) {
+        badge.classList.add("bg-green-50", "text-green-700", "border-green-200");
+      } else if (pct > 20) {
+        badge.classList.add("bg-yellow-50", "text-yellow-700", "border-yellow-200");
+      } else {
+        badge.classList.add("bg-red-50", "text-red-700", "border-red-200");
+      }
+    } catch (_) { }
   }
 
   showToast(message) {

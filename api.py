@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from chatbot import ChatbotManager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from rate_limiter import RateLimiter
 
 app = FastAPI(title="Chatbot Manager API")
 app.add_middleware(
@@ -103,6 +104,14 @@ def chat_endpoint(request: ChatRequest):
 
     return StreamingResponse(iterate_responses(), media_type="text/plain")
     
+
+@app.get("/rate-status")
+def rate_status():
+    try:
+        return RateLimiter.get_rate_limit_headers()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

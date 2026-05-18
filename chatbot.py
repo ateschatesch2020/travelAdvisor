@@ -13,6 +13,8 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openrouter import ChatOpenRouter
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
+import openai
+from rate_limiter import RateLimiter
 load_dotenv()
 
 
@@ -115,6 +117,7 @@ class ChatbotManager:
         model_with_tools = self.model.bind_tools(self.tools)
         tool_map = {t.name: t for t in self.tools}
 
+        @RateLimiter.with_retry
         def run_with_tools(inputs):
             prompt_messages = prompt.invoke(inputs).to_messages()
             ai_msg = model_with_tools.invoke(prompt_messages)
@@ -219,6 +222,8 @@ class ChatbotManager:
                 {"question": query},
                 config=config)
             return response
+        except openai.RateLimitError:
+            return "Rate limit reached. Please try again in a moment."
         except Exception as e:
             print(f"An error occurred: {e}")
             return "Sorry, I encountered an error while processing your request."
@@ -230,6 +235,8 @@ class ChatbotManager:
                 {"question": query},
                     config=config):
                 yield chunk
+        except openai.RateLimitError:
+            yield "Rate limit reached. Please try again in a moment."
         except Exception as e:
             print(f"Error occurred: {e}")
             yield "Sorry, I encountered an error while processing your request."
