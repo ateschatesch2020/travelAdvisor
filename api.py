@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from fastapi import FastAPI, HTTPException
 from chatbot import ChatbotManager
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,12 +16,30 @@ app.add_middleware(
 chatbot = ChatbotManager()
 
 class CreateSessionRequest(BaseModel):
-    user_id: str
-    title: str = "New Chat Session"
+    user_id: str = Field(min_length=1)
+    title: str = Field(default="New Chat Session", min_length=1, max_length=100)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def strip_title(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+        if not v:
+            raise ValueError("title must not be empty")
+        return v
 
 class ChatRequest(BaseModel):
-    session_id: str
-    query: str  
+    session_id: str = Field(min_length=1)
+    query: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("query", mode="before")
+    @classmethod
+    def strip_query(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+        if not v:
+            raise ValueError("query must not be empty")
+        return v
 
 class MessageResponse(BaseModel):
     content: str

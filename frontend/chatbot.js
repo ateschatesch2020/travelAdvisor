@@ -143,6 +143,13 @@ class ChatBot {
         signal: signal
       });
 
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const detail = err?.detail?.[0]?.msg ?? "Invalid request.";
+        contentDiv.innerHTML = `<span class='text-red-500'>⚠️ ${detail}</span>`;
+        return;
+      }
+
       //getting the response of llm as stream
       const reader = res.body.getReader();
       const decoder = new TextDecoder("utf-8");
