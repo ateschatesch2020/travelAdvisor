@@ -41,19 +41,19 @@ class ChatbotManager:
 
         self.rephrase_system = """
         Consider the history of the conversation. If the user uses pronouns like "it", "them",
-        which cites the term in the conversation history, change the user input including the term instead of 
+        which cites the term in the conversation history, change the user input including the term instead of
         that pronoun. If there aren't any pronouns of citation, don't change the query.
-         
+
         Don't give answer, just give the corrected question.
         """
 
         self.system_prompt = """
-        You are a travel advisor based on the regulations of the company.   
+        You are a travel advisor based on the regulations of the company.
         If the answer is not in this context, say kindly that you don't know. Never make it up.
         When a question required to be searched or calculated, use the tools.
         For general advices or questions respond directly without calling tools.
         If the question is in turkish, answer in turkish, if the question is in german, answer in german etc.
-        
+
         For specific prices of flights use search_flights tool.
         For specific prices of hotels use search_hotels tool.
         For weather forecast for a specific date use search_weather tool.
@@ -117,19 +117,29 @@ class ChatbotManager:
         model_with_tools = self.model.bind_tools(self.tools)
         tool_map = {t.name: t for t in self.tools}
 
-        @RateLimiter.with_retry
         def run_with_tools(inputs):
             prompt_messages = prompt.invoke(inputs).to_messages()
+
+            # invoke() gives a proper AIMessage with reliably populated tool_calls
             ai_msg = model_with_tools.invoke(prompt_messages)
+
             if not ai_msg.tool_calls:
-                return ai_msg.content
+                # Stream the response token-by-token
+                for chunk in model_with_tools.stream(prompt_messages):
+                    yield chunk.content or ""
+                return
+
+            # Execute tools
             prompt_messages.append(ai_msg)
             for tc in ai_msg.tool_calls:
                 result = tool_map[tc["name"]].invoke(tc["args"])
                 prompt_messages.append(
                     ToolMessage(content=str(result), tool_call_id=tc["id"])
                 )
-            return model_with_tools.invoke(prompt_messages).content
+
+            # Stream final response after tool results
+            for chunk in model_with_tools.stream(prompt_messages):
+                yield chunk.content or ""
 
         chain = (
             RunnablePassthrough.assign(
@@ -141,11 +151,14 @@ class ChatbotManager:
                 | RunnableLambda(inspect_query)
                 | self.retriever | self._format_docs,
             )
-            | RunnableLambda(run_with_tools)
+        | RunnableLambda(run_with_tools)
         )
 
+        self.rephrase_chain = rephrase_chain
+        self.run_with_tools = run_with_tools
+
         return RunnableWithMessageHistory(
-            chain,  # the response of the whole chain after StrOutputParser
+            chain,
             self._get_session_history,
             input_messages_key="question",
             history_messages_key="history")
@@ -229,16 +242,36 @@ class ChatbotManager:
             return "Sorry, I encountered an error while processing your request."
 
     def chat_stream(self, session_id: str, query: str):
-        config = {"configurable": {"session_id": session_id}}
+        history = self._get_session_history(session_id)
         try:
-            for chunk in self.conversation_chain.stream(
-                {"question": query},
-                    config=config):
-                yield chunk
+            messages = history.messages
+
+            search_query = self.rephrase_chain.invoke(
+                {"question": query, "history": messages}
+            )
+            context = self._format_docs(self.retriever.invoke(search_query))
+
+            inputs = {
+                "question": query,
+                "history": messages,
+                "context": context,
+                "search_query": search_query,
+            }
+
+            accumulated = ""
+            for token in self.run_with_tools(inputs):
+                accumulated += token
+                yield token
+
+            history.add_user_message(query)
+            history.add_ai_message(accumulated)
+
         except openai.RateLimitError:
             yield "Rate limit reached. Please try again in a moment."
         except Exception as e:
+            import traceback
             print(f"Error occurred: {e}")
+            traceback.print_exc()
             yield "Sorry, I encountered an error while processing your request."
 
 

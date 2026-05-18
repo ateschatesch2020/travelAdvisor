@@ -78,6 +78,8 @@ def search_hotels(location: str, check_in_date: str, check_out_date: str = "") -
     Returns name, type, location, price per night, free cancellation info, amenities, nearby places and image.
     """
     from datetime import datetime, timedelta
+    if not check_in_date:
+        return "check_in_date is required. Please ask the user for a specific check-in date in YYYY-MM-DD format (e.g., '2026-06-15')."
     if not check_out_date:
         check_out_date = (datetime.strptime(check_in_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
     check_in_dt  = datetime.strptime(check_in_date,  "%Y-%m-%d")
