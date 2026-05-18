@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\atesa\\\\source\\\\repos\\\\travelAdvisor\\\\frontend\" -Recurse -Include \"*.css\",\"*.scss\" -ErrorAction SilentlyContinue)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(python -m pytest test_api.py -v)",
+      "Bash(pip list *)",
+      "Bash(pip install *)"
     ]
   }
 }
