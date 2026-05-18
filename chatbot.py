@@ -1,29 +1,21 @@
 from langchain_openrouter import ChatOpenRouter
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 load_dotenv()
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import SQLChatMessageHistory
 from langchain_chroma import Chroma
 from operator import itemgetter
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
-from langchain.agents import create_agent
-from langgraph.checkpoint.memory import MemorySaver
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import ToolMessage
 
 
 import tools
-import faiss
 import sqlite3
 import uuid
-import json
-import numpy as np
 import os
 
 
@@ -37,8 +29,6 @@ class ChatbotManager:
         self.model = ChatOpenRouter(
             model=self.model_name)
 
-        # self.embedding_model = HuggingFaceEmbeddings(
-        #   model="sentence-transformers/all-MiniLM-L6-v2")
         self.embedding_model = OpenAIEmbeddings(
             model="openai/text-embedding-3-small",
             base_url="https://openrouter.ai/api/v1",
@@ -49,10 +39,6 @@ class ChatbotManager:
             embedding_function=self.embedding_model)
         self.retriever = self.vectorestore.as_retriever(search_kwargs={"k": 2})
         self._init_session_db()
-
-        self.checkpointer = MemorySaver()
-
-
 
         self.rephrase_system ="""
         Consider the history of the conversation. If the user uses pronouns like "it", "them",
@@ -69,31 +55,17 @@ class ChatbotManager:
         For general advices or questions respond directly without calling tools.
         If the question is in turkish, answer in turkish, if the question is in german, answer in german etc.
         
-        For specific prices of flights use get_flight_prices tool.
-        For specific prices of hotels use get_hotel_prices tool.
-        For weather forecast for a specific date use get_weather tool.
-        For calculation use calculator tool.
+        For specific prices of flights use search_flights tool.
+        For specific prices of hotels use search_hotels tool.
+        For weather forecast for a specific date use search_weather tool.
 
         context:
         {context}
         """
+        self.tools = tools.Tools.tools
+
         # create chain
         self.conversation_chain = self._create_chain()
-
-        self.agent_prompt ="""
-        You are a travel advisor.
-        When a question required to be searched or calculated, use the tools.
-        For general advices or questions respond directly without calling tools.
-        If the question is in turkish, answer in turkish, if the question is in german, answer in german etc.
-
-        """
-        self.tools = tools.Tools.tools
-        self.myagent = create_agent(
-            model = self.model,
-            tools = self.tools ,
-            system_prompt=self.agent_prompt,
-            checkpointer=self.checkpointer
-        ) 
 
     def _init_session_db(self):
         """creates chat_sessions table in sqlite db"""
@@ -112,7 +84,7 @@ class ChatbotManager:
         conn.commit()
         conn.close()
 
-    def _get_session_history(self, session_id: str) -> ChatMessageHistory:
+    def _get_session_history(self, session_id: str):
         """ gets the chat history of given session_id from sqlite database"""
         return SQLChatMessageHistory(
             session_id=session_id,
@@ -143,23 +115,33 @@ class ChatbotManager:
             print(f"the question gone to retriever: {query} ")
             return query
 
+        model_with_tools = self.model.bind_tools(self.tools)
+        tool_map = {t.name: t for t in self.tools}
+
+        def run_with_tools(inputs):
+            prompt_messages = prompt.invoke(inputs).to_messages()
+            ai_msg = model_with_tools.invoke(prompt_messages)
+            if not ai_msg.tool_calls:
+                return ai_msg.content
+            prompt_messages.append(ai_msg)
+            for tc in ai_msg.tool_calls:
+                result = tool_map[tc["name"]].invoke(tc["args"])
+                prompt_messages.append(
+                    ToolMessage(content=str(result), tool_call_id=tc["id"])
+                )
+            return model_with_tools.invoke(prompt_messages).content
+
         chain = (
                     RunnablePassthrough.assign(
-                        search_query = rephrase_chain 
-                        # rephrase_chain is executed here and the output is assigned to search_query
+                        search_query = rephrase_chain
                     )
                     |
                     RunnablePassthrough.assign(
-                        # the output of the previous item of the chain is given to RunnableLambda
-                        # to be written in inspect_query and then as input to retriever and then to format_docs
                         context = itemgetter("search_query")
-                        | RunnableLambda(inspect_query) 
+                        | RunnableLambda(inspect_query)
                         | self.retriever | self._format_docs,
                     )
-                    # prompt needs context which is the previous item of the chain
-                    | prompt
-                    | self.model
-                    | StrOutputParser()
+                    | RunnableLambda(run_with_tools)
                  )
         
         return RunnableWithMessageHistory(
@@ -253,67 +235,8 @@ class ChatbotManager:
             print(f"Error occurred: {e}")
             yield "Sorry, I encountered an error while processing your request."
 
-    def embed(self, text):
-        response = self.embedding_model.embed_query(text)
-        k = 2
-        index = faiss.IndexFlatL2(1536)
-        distances, indices = index.search(
-        np.array([response]), k
-        )
-        return response;
-
-    def chat_by_vector(self, session_id: str, query: str) -> str:
-        config = {"configurable": {"session_id": session_id}}
-        try:
-            vector = self.embed(query)
-            docs = self.vectorestore.similarity_search_by_vector(vector, k=2)
-            response = self.conversation_chain.invoke(
-                {"question": self._format_docs(docs)},
-                config=config)
-            return response
-        except Exception as e:
-            print(f"Error occurred: {e}")
-            return "Sorry, I encountered an error while processing your request."
-
-    def chat_by_vector_stream(self, session_id: str, query: str):
-        config = {"configurable": {"session_id": session_id}}
-        try:
-            vector = self.embed(query)
-            docs = self.vectorestore.similarity_search_by_vector(vector, k=2)
-            for doc in docs:
-                yield doc.page_content
-        except Exception as e:
-            print(f"Error occurred: {e}")
-            yield "Sorry, I encountered an error while processing your request."
-
-    def invoke_with_user(self, user_id: str, question: str):
-        thread_id = f"user_session_{user_id}"
-        return self.myagent.invoke({
-            "messages": [HumanMessage(content=question)]},
-            config={"configurable": {"thread_id": thread_id}}
-    )
-
 if __name__ == "__main__":
     manager = ChatbotManager()
-
     user = "user123"
-
-    session_id = manager.create_session(user, "Test Tools")
-
-    # print(manager.chat(session_id,
-    #        "What is the hotel price limit in USA?"))
-    
-    # print(manager.chat(session_id,
-    #         "What about south america?"))
-    
-    response1 = manager.invoke_with_user(user, "I want to you list me the flights on 10.05.2026 from Munich to Madrid direct only, all airlines")
-    print("1.Yanıt: ", response1["messages"][-1].content)
-
-    # print(manager.chat_by_vector(session_id,
-    #        "Temel gelir desteğinin faydaları özellikle hangi alanlara yönelik olmalıdır?"))
-    
-    # print(manager.chat_by_vector(session_id,
-    #        "Buna ücretli iş de dahil mi?"))
-    # session_id = manager.create_session("Ates Ates", "Turkish Search Test")
-    # turkish_question = "Temel gelir desteği yardımlarının ana amaçları nelerdir?"
-    # print(manager.chat_by_vector(session_id, turkish_question))
+    session_id = manager.create_session(user, "Test Chat")
+    print(manager.chat(session_id, "What are the direct flights from Munich to Madrid on 2026-06-10?"))
