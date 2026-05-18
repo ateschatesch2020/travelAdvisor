@@ -80,6 +80,10 @@ def search_hotels(location: str, check_in_date: str, check_out_date: str = "") -
     from datetime import datetime, timedelta
     if not check_out_date:
         check_out_date = (datetime.strptime(check_in_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    check_in_dt  = datetime.strptime(check_in_date,  "%Y-%m-%d")
+    check_out_dt = datetime.strptime(check_out_date, "%Y-%m-%d")
+    if (check_out_dt - check_in_dt).days > 7:
+        return "Hotel stay exceeds 7 days. Please limit hotel searches to a maximum of 7 nights."
     client = serpapi.Client(api_key=os.getenv("SERPAPI_KEY"))
     raw = client.search({
         "engine": "google_hotels",
@@ -187,6 +191,11 @@ def optimize_itinerary(
         iata = dict(p.strip().split(":") for p in city_iata_pairs.split(","))
         start_date_obj = _date.fromisoformat(start_date)
         end_date_obj   = _date.fromisoformat(end_date)
+        if (end_date_obj - start_date_obj).days > 7:
+            return (
+                "Trip duration exceeds 7 days. "
+                "Please limit your trip window to a maximum of 7 days to control API costs."
+            )
     except Exception as e:
         logger.error("optimize_itinerary: parameter parsing failed — %s", e, exc_info=True)
         return (

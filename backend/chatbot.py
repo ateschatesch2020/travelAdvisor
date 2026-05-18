@@ -82,6 +82,7 @@ class ChatbotManager:
         Reply in the same language as the user.
         When presenting hotel results, show each hotel image using markdown image syntax ![Hotel Name](image_url) at the start of each hotel entry.
         When presenting itinerary optimization results, always include in your response the number of flight routes searched, weather records fetched, and total combinations evaluated, as provided in the tool output.
+        Trip planning and hotel searches are limited to a maximum of 7 days. If the user requests a longer window, politely explain this limit before calling any tool.
         """
 
         self.tools = tools.Tools.tools

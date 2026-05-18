@@ -176,31 +176,31 @@ def _mock_weather(args):
 class TestSolveItinerary(unittest.TestCase):
 
     def test_finds_cheapest_ordering(self):
-        result = solve_itinerary(_two_city_inp())
+        result, _ = solve_itinerary(_two_city_inp())
         self.assertIsNotNone(result)
         self.assertEqual(result.city_order, ["Barcelona", "Madrid"])
         self.assertAlmostEqual(result.total_cost_usd, 270.0, places=2)
 
     def test_solution_passes_verify(self):
         inp = _two_city_inp()
-        result = solve_itinerary(inp)
+        result, _ = solve_itinerary(inp)
         self.assertIsNotNone(result)
         self.assertEqual(_verify(inp, result), [])
 
     def test_leg_count_equals_num_to_visit_plus_one(self):
-        result = solve_itinerary(_two_city_inp(num_to_visit=2))
+        result, _ = solve_itinerary(_two_city_inp(num_to_visit=2))
         self.assertIsNotNone(result)
         self.assertEqual(len(result.legs), 3)
 
     def test_nights_within_min_max_bounds(self):
-        result = solve_itinerary(_two_city_inp(min_nights=2, max_nights=3))
+        result, _ = solve_itinerary(_two_city_inp(min_nights=2, max_nights=3))
         self.assertIsNotNone(result)
         for nights in result.nights_per_city:
             self.assertGreaterEqual(nights, 2)
             self.assertLessEqual(nights, 3)
 
     def test_no_flights_returns_none(self):
-        result = solve_itinerary(_two_city_inp(flights={}))
+        result, _ = solve_itinerary(_two_city_inp(flights={}))
         self.assertIsNone(result)
 
     def test_impossible_window_returns_none(self):
@@ -224,11 +224,12 @@ class TestSolveItinerary(unittest.TestCase):
             weather_data=TWO_CITY_WEATHER,
             weather_constraints=WeatherConstraints(),
         )
-        self.assertIsNone(solve_itinerary(inp))
+        result2, _ = solve_itinerary(inp)
+        self.assertIsNone(result2)
 
     def test_selects_cheapest_city_subset(self):
         # 3 candidates, pick 2 — cheapest pair includes Barcelona ($170)
-        result = solve_itinerary(_three_city_inp())
+        result, _ = solve_itinerary(_three_city_inp())
         self.assertIsNotNone(result)
         self.assertIn("Barcelona", result.city_order)
         self.assertAlmostEqual(result.total_cost_usd, 170.0, places=2)
@@ -236,7 +237,7 @@ class TestSolveItinerary(unittest.TestCase):
     def test_weather_constraint_excludes_city(self):
         # Barcelona has 95% rain chance; constraint cap is 50% → BCN filtered out entirely
         # Cheapest remaining pair: Madrid → Lisbon = $240
-        result = solve_itinerary(_three_city_inp(
+        result, _ = solve_itinerary(_three_city_inp(
             weather=THREE_CITY_WEATHER_BAD_BCN,
             constraints=WeatherConstraints(max_rain_pct=50.0),
         ))
@@ -258,7 +259,7 @@ class TestOptimizeItineraryTool(unittest.TestCase):
         "origin_iata": "MUC",
         "num_to_visit": 2,
         "start_date": "2026-06-01",
-        "end_date": "2026-06-10",
+        "end_date": "2026-06-07",
         "min_nights": 2,
         "max_nights": 3,
     }
@@ -287,7 +288,7 @@ class TestOptimizeItineraryTool(unittest.TestCase):
         from tools import optimize_itinerary
         result = optimize_itinerary.invoke(self._TOOL_ARGS)
 
-        self.assertIn("No feasible itinerary found", result)
+        self.assertIn("no itinerary satisfied all constraints", result)
 
     @patch("tools.search_weather")
     @patch("tools.search_flights")
