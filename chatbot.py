@@ -1,22 +1,19 @@
+import os
+import uuid
+import sqlite3
+import tools
+from langchain_core.messages import ToolMessage
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+from operator import itemgetter
+from langchain_chroma import Chroma
+from langchain_community.chat_message_histories import SQLChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openrouter import ChatOpenRouter
 from langchain_openai import OpenAIEmbeddings
 from dotenv import load_dotenv
 load_dotenv()
-
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_community.chat_message_histories import SQLChatMessageHistory
-from langchain_chroma import Chroma
-from operator import itemgetter
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
-from langchain_core.messages import ToolMessage
-
-
-import tools
-import sqlite3
-import uuid
-import os
 
 
 class ChatbotManager:
@@ -35,12 +32,12 @@ class ChatbotManager:
             api_key=os.getenv("OPENROUTER_API_KEY"))
         persist_directory = "./chroma_db"
         self.vectorestore = Chroma(
-            persist_directory=persist_directory, 
+            persist_directory=persist_directory,
             embedding_function=self.embedding_model)
         self.retriever = self.vectorestore.as_retriever(search_kwargs={"k": 2})
         self._init_session_db()
 
-        self.rephrase_system ="""
+        self.rephrase_system = """
         Consider the history of the conversation. If the user uses pronouns like "it", "them",
         which cites the term in the conversation history, change the user input including the term instead of 
         that pronoun. If there aren't any pronouns of citation, don't change the query.
@@ -48,7 +45,7 @@ class ChatbotManager:
         Don't give answer, just give the corrected question.
         """
 
-        self.system_prompt ="""
+        self.system_prompt = """
         You are a travel advisor based on the regulations of the company.   
         If the answer is not in this context, say kindly that you don't know. Never make it up.
         When a question required to be searched or calculated, use the tools.
@@ -96,7 +93,7 @@ class ChatbotManager:
 
     def _create_chain(self):
         """ creates the chain which combine the prompt and llm"""
-              
+
         rephrase_prompt = ChatPromptTemplate.from_messages([
             ("system", self.rephrase_system),
             MessagesPlaceholder(variable_name="history"),
@@ -104,11 +101,11 @@ class ChatbotManager:
         ])
 
         rephrase_chain = rephrase_prompt | self.model | StrOutputParser()
-        
+
         prompt = ChatPromptTemplate.from_messages([
             ("system", self.system_prompt),
             MessagesPlaceholder(variable_name="history"),
-            ("human" , "{question}")
+            ("human", "{question}")
         ])
 
         def inspect_query(query):
@@ -132,20 +129,20 @@ class ChatbotManager:
             return model_with_tools.invoke(prompt_messages).content
 
         chain = (
-                    RunnablePassthrough.assign(
-                        search_query = rephrase_chain
-                    )
-                    |
-                    RunnablePassthrough.assign(
-                        context = itemgetter("search_query")
-                        | RunnableLambda(inspect_query)
-                        | self.retriever | self._format_docs,
-                    )
-                    | RunnableLambda(run_with_tools)
-                 )
-        
+            RunnablePassthrough.assign(
+                search_query=rephrase_chain
+            )
+            |
+            RunnablePassthrough.assign(
+                context=itemgetter("search_query")
+                | RunnableLambda(inspect_query)
+                | self.retriever | self._format_docs,
+            )
+            | RunnableLambda(run_with_tools)
+        )
+
         return RunnableWithMessageHistory(
-            chain,# the response of the whole chain after StrOutputParser
+            chain,  # the response of the whole chain after StrOutputParser
             self._get_session_history,
             input_messages_key="question",
             history_messages_key="history")
@@ -166,14 +163,16 @@ class ChatbotManager:
         except Exception as e:
             print(f"An error occurred: {e}")
             return "Sorry, I encountered an error while processing your request."
-        
+
     def delete_session(self, session_id: str) -> str:
         """Deletes session and its messages atomically."""
         conn = sqlite3.connect(self.db_file_path)
         try:
             cursor = conn.cursor()
-            cursor.execute('DELETE FROM message_store WHERE session_id = ?', (session_id,))
-            cursor.execute('DELETE FROM chat_sessions WHERE session_id = ?', (session_id,))
+            cursor.execute(
+                'DELETE FROM message_store WHERE session_id = ?', (session_id,))
+            cursor.execute(
+                'DELETE FROM chat_sessions WHERE session_id = ?', (session_id,))
             conn.commit()
             return session_id
         except Exception as e:
@@ -184,7 +183,7 @@ class ChatbotManager:
             conn.close()
 
     def list_sessions(self, user_id: str):
-        
+
         conn = sqlite3.connect(self.db_file_path)
         conn.row_factory = sqlite3.Row  # enable dict-like access to rows
         cursor = conn.cursor()
@@ -235,8 +234,10 @@ class ChatbotManager:
             print(f"Error occurred: {e}")
             yield "Sorry, I encountered an error while processing your request."
 
+
 if __name__ == "__main__":
     manager = ChatbotManager()
     user = "user123"
     session_id = manager.create_session(user, "Test Chat")
-    print(manager.chat(session_id, "What are the direct flights from Munich to Madrid on 2026-06-10?"))
+    print(manager.chat(session_id,
+          "What are the direct flights from Munich to Madrid on 2026-06-10?"))

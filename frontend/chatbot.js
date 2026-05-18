@@ -75,7 +75,7 @@ class ChatBot {
       });
       if (res.ok) await this.loadSessions();
     } catch (e) {
-      console.log(e);
+      this.showToast("Could not rename session — is the server running?");
     }
   }
 
@@ -100,7 +100,7 @@ class ChatBot {
         await this.loadSessions();
       }
     } catch (e) {
-      console.log(e);
+      this.showToast("Could not delete session — is the server running?");
     }
   }
   async sendMessage() {
@@ -165,9 +165,12 @@ class ChatBot {
     } catch (err) {
       if (err.name === "AbortError") {
         contentDiv.innerHTML = "<span class='text-xs text-red-500 italic'>Interrupted.</span>";
+      } else if (err instanceof TypeError) {
+        contentDiv.innerHTML = "<span class='text-red-500'>⚠️ Could not reach the server.</span>";
+        this.showToast("Connection error — is the server running?");
       } else {
-        contentDiv.innerHTML = "<span class='text-red-500'>⚠️An error occurred.</span>";
-        console.log(err);
+        contentDiv.innerHTML = "<span class='text-red-500'>⚠️ An error occurred.</span>";
+        this.showToast("An unexpected error occurred.");
       }
     } finally {
       this.abortController = null;
@@ -230,7 +233,7 @@ class ChatBot {
         listContainer.appendChild(btn);
       });
     } catch (e) {
-      console.log(e);
+      this.showToast("Could not load sessions — is the server running?");
     }
   }
 
@@ -258,7 +261,7 @@ class ChatBot {
       messages.forEach((msg) => this.appendMessage(msg.role, msg.content));
       this.scrollToBottom();
     } catch (e) {
-      console.error(e);
+      this.showToast("Could not load chat history — is the server running?");
     }
   }
 
@@ -275,7 +278,7 @@ class ChatBot {
       const data = await res.json();
       await this.loadChatHistory(data.session_id);
     } catch (error) {
-      console.error(error);
+      this.showToast("Could not create session — is the server running?");
     }
   }
 
@@ -319,6 +322,15 @@ class ChatBot {
         });
       }, 50);
     }
+  }
+
+  showToast(message) {
+    const toast = document.createElement("div");
+    toast.className =
+      "fixed top-4 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 animate-fade-in";
+    toast.innerHTML = `<i class="fa-solid fa-circle-exclamation"></i><span>${message}</span>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 4000);
   }
 }
 // to ensure that init method will be called after all elements were loaded.
