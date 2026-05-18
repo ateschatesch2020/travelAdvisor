@@ -18,9 +18,26 @@ WEATHER_API_KEY=your_weatherapi_key
 
 ## Running
 
+### Backend
+
 ```bash
 pip install -r requirements.txt
 python api.py
 ```
 
 The API will be available at `http://localhost:8001`.
+
+### Frontend
+
+```bash
+cd frontend
+npm install   # first time only
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173`.
+
+
+### Sprint 2
+
+The Sprint 2 is in the sprint2 branch.
